@@ -1,95 +1,99 @@
 package ro.pub.cs.systems.eim.practicaltest02.network;
 
-import android.util.Log;
+import android.widget.EditText;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-
-import cz.msebera.android.httpclient.client.ClientProtocolException;
-import ro.pub.cs.systems.eim.practicaltest02.general.Constants;
-import ro.pub.cs.systems.eim.practicaltest02.model.WeatherForecastInformation;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.util.Date;
 
 public class ServerThread extends Thread {
+    EditText server_port;
+    ServerSocket server_socket;
 
-    private int port = 0;
-    private ServerSocket serverSocket = null;
+    private String EUR_RATE;
+    private String USD_RATE;
+    private Timestamp EUR;
+    private Timestamp USD;
 
-    private HashMap<String, WeatherForecastInformation> data = null;
+    boolean isRunning = false;
 
-    public ServerThread(int port) {
-        this.port = port;
-        try {
-            this.serverSocket = new ServerSocket(port);
-        } catch (IOException ioException) {
-            Log.e(Constants.TAG, "An exception has occurred: " + ioException.getMessage());
-            if (Constants.DEBUG) {
-                ioException.printStackTrace();
-            }
+    public ServerThread(EditText server_port) {
+        this.server_port = server_port;
+    }
+
+    public void startServer() {
+        isRunning = true;
+        Date date= new Date();
+
+        long time = date.getTime() - 6000000;
+        Timestamp ts = new Timestamp(time);
+        EUR_RATE = "0.0";
+        USD_RATE = "0.0";
+        EUR = ts;
+        USD = ts;
+        start();
+    }
+
+    public synchronized boolean shouldUpdateEURRate(Timestamp ts) {
+
+
+        if (ts.getTime() - this.EUR.getTime() >= 60000) {
+            this.EUR = ts;
+            return true;
         }
-        this.data = new HashMap<>();
+        return false;
     }
 
-    public void setPort(int port) {
-        this.port = port;
+    public synchronized boolean shouldUpdateUSDRate(Timestamp ts) {
+        if (ts.getTime() - this.USD.getTime() >= 60000) {
+            this.USD = ts;
+            return true;
+        }
+        return false;
     }
 
-    public int getPort() {
-        return port;
+    public synchronized void updateEURRate(String newRate, Timestamp ts) {
+        this.EUR = ts;
+        this.EUR_RATE = newRate;
+
     }
 
-    public void setServerSocket(ServerSocket serverSocket) {
-        this.serverSocket = serverSocket;
+    public synchronized void updateUSDRate(String newRate, Timestamp ts) {
+        this.USD = ts;
+        this.USD_RATE = newRate;
+
     }
 
-    public ServerSocket getServerSocket() {
-        return serverSocket;
+    public String getEURRate() {
+        return this.EUR_RATE;
     }
 
-    public synchronized void setData(String city, WeatherForecastInformation weatherForecastInformation) {
-        this.data.put(city, weatherForecastInformation);
+    public String getUSDRate() {
+        return this.USD_RATE;
     }
 
-    public synchronized HashMap<String, WeatherForecastInformation> getData() {
-        return data;
+    public void stopServer() throws IOException {
+        if (server_socket != null)
+            server_socket.close();
     }
 
     @Override
     public void run() {
         try {
-            while (!Thread.currentThread().isInterrupted()) {
-                Log.i(Constants.TAG, "[SERVER THREAD] Waiting for a client invocation...");
-                Socket socket = serverSocket.accept();
-                Log.i(Constants.TAG, "[SERVER THREAD] A connection request was received from " + socket.getInetAddress() + ":" + socket.getLocalPort());
-                CommunicationThread communicationThread = new CommunicationThread(this, socket);
-                communicationThread.start();
-            }
-        } catch (ClientProtocolException clientProtocolException) {
-            Log.e(Constants.TAG, "[SERVER THREAD] An exception has occurred: " + clientProtocolException.getMessage());
-            if (Constants.DEBUG) {
-                clientProtocolException.printStackTrace();
-            }
-        } catch (IOException ioException) {
-            Log.e(Constants.TAG, "[SERVER THREAD] An exception has occurred: " + ioException.getMessage());
-            if (Constants.DEBUG) {
-                ioException.printStackTrace();
-            }
-        }
-    }
+            server_socket = new ServerSocket(Integer.valueOf(server_port.getText().toString()));
+            while (isRunning) {
+                Socket socket = server_socket.accept();
 
-    public void stopThread() {
-        interrupt();
-        if (serverSocket != null) {
-            try {
-                serverSocket.close();
-            } catch (IOException ioException) {
-                Log.e(Constants.TAG, "[SERVER THREAD] An exception has occurred: " + ioException.getMessage());
-                if (Constants.DEBUG) {
-                    ioException.printStackTrace();
+                if (socket != null) {
+                    CommunicationThread comm = new CommunicationThread(socket, this);
+                    comm.start();
                 }
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
-
 }

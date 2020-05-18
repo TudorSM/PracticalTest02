@@ -1,79 +1,59 @@
 package ro.pub.cs.systems.eim.practicaltest02.network;
 
+import android.graphics.Bitmap;
+import android.os.AsyncTask;
 import android.util.Log;
 import android.widget.TextView;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
 
 import ro.pub.cs.systems.eim.practicaltest02.general.Constants;
 import ro.pub.cs.systems.eim.practicaltest02.general.Utilities;
 
-public class ClientThread extends Thread {
+public class CommunicationThread extends AsyncTask<String, String, Void> {
 
-    private String address;
-    private int port;
-    private String city;
-    private String informationType;
-    private TextView weatherForecastTextView;
 
-    private Socket socket;
+    TextView response;
 
-    public ClientThread(String address, int port, String city, String informationType, TextView weatherForecastTextView) {
-        this.address = address;
-        this.port = port;
-        this.city = city;
-        this.informationType = informationType;
-        this.weatherForecastTextView = weatherForecastTextView;
+    public CommunicationThread(TextView response) {
+        this.response = response;
     }
-
     @Override
-    public void run() {
+    protected Void doInBackground(String... strings) {
         try {
-            socket = new Socket(address, port);
-            if (socket == null) {
-                Log.e(Constants.TAG, "[CLIENT THREAD] Could not create socket!");
-                return;
+            String address = strings[0],
+                    port = strings[1],
+                    currency = strings[2];
+
+            if (!currency.equals(Constants.USD) && !currency.equals(Constants.EUR)) {
+                Log.d(Constants.DEBUG, Constants.INVALID_CURRENCY);
+                publishProgress(Constants.INVALID_CURRENCY);
+                return null;
             }
-            BufferedReader bufferedReader = Utilities.getReader(socket);
-            PrintWriter printWriter = Utilities.getWriter(socket);
-            if (bufferedReader == null || printWriter == null) {
-                Log.e(Constants.TAG, "[CLIENT THREAD] Buffered Reader / Print Writer are null!");
-                return;
-            }
-            printWriter.println(city);
-            printWriter.flush();
-            printWriter.println(informationType);
-            printWriter.flush();
-            String weatherInformation;
-            while ((weatherInformation = bufferedReader.readLine()) != null) {
-                final String finalizedWeateherInformation = weatherInformation;
-                weatherForecastTextView.post(new Runnable() {
-                   @Override
-                    public void run() {
-                       weatherForecastTextView.setText(finalizedWeateherInformation);
-                   }
-                });
-            }
-        } catch (IOException ioException) {
-            Log.e(Constants.TAG, "[CLIENT THREAD] An exception has occurred: " + ioException.getMessage());
-            if (Constants.DEBUG) {
-                ioException.printStackTrace();
-            }
-        } finally {
-            if (socket != null) {
-                try {
-                    socket.close();
-                } catch (IOException ioException) {
-                    Log.e(Constants.TAG, "[CLIENT THREAD] An exception has occurred: " + ioException.getMessage());
-                    if (Constants.DEBUG) {
-                        ioException.printStackTrace();
-                    }
-                }
-            }
+
+            Socket socket = new Socket(address, Integer.valueOf(port));
+            PrintWriter writer = Utilities.getWriter(socket);
+            BufferedReader reader = Utilities.getReader(socket);
+
+            writer.println(currency);
+            writer.flush();
+
+            String value = reader.readLine();
+            publishProgress(value);
+
+            socket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+        return null;
     }
 
+    protected void onProgressUpdate(String... result) {
+        response.setText(result[0]);
+    }
+
+    protected void onPostExecute(Bitmap result) {
+    }
 }
