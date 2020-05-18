@@ -136,10 +136,10 @@ public class CommunicationThread extends Thread {
                     }
 
                     JSONObject main = content.getJSONObject(Constants.MAIN);
-                    String temperature = main.getString(Constants.TEMP);
+                    String eur = main.getString(Constants.EUR);
 
                     JSONObject wind = content.getJSONObject(Constants.WIND);
-                    String windSpeed = wind.getString(Constants.SPEED);
+                    String usd = wind.getString(Constants.USD);
 
                     weatherForecastInformation = new WeatherForecastInformation(
                             temperature, windSpeed, condition, pressure, humidity
